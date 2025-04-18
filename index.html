@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Better Mobile Handling -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- HTML Page Design Stuff -->
+    <title>Honolulu 216 Marker Set Palette Generator</title>
+    <style>
+    body {
+    font-family: Verdana, sans-serif;
+    margin: 20px;
+    text-align: center;
+    background-color: #E6E6FA;
+ 	   }
+  .palette-Display {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+      }
+      .color-block {
+        width: 150px;
+        height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(255, 208, 208, 0.2);
+        cursor: pointer;
+      }
+      .color-block div {
+        text-align: center;
+      }
+      .MarkerLine-buttons {
+        margin-top: 20px;
+      }
+      .MarkerLine-buttons button {
+        margin: 5px;
+        padding: 10px 20px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .selected {
+        border: 2px solid #f3c2e4;
+        background-color: #E69DB8;
+      }
+      .generate-another-btn {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #E69DB8;
+        color: white;
+        border: none;
+        border-radius: 5px;
+      }
+      .generate-another-btn:hover {
+        background-color: #F7CFD8;
+      }
+  </style>
+  </head>
+  <body>
+    <!-- Title and Intro -->
+    <h1>Honolulu 216 Marker Set Palette Generator</h1>
+    <p>Generates 10 different colors</p>
+    
+    <!--Marker Line Buttons -->
+    <div class="MarkerLine-buttons">
+    </div>
+
+    <!-- Filter Dropdown -->
+    <div class="filter-container">
+      <select
+        class="filter-dropdown"
+        id="filterSelect"
+        onchange="handleFilterChange()"
+      > 
+       <option value="random">Totally Random</option>
+        <option value="similar">Similar Colors*</option>
+        <option value="warm">Warm Colors</option>
+        <option value="cool">Cool Colors</option>
+        <option value="pastel">Pastel Colors</option>
+        <option value="vivid">Vivid Colors</option>
+        <option value="moody">Moody Colors</option>
+        <option value="neutrals">Neutral Colors</option>
+        <option value="complementary">Complementary Colors</option>
+        <option value="analogous">Analogous Colors</option>
+        <option value="triadic">Triadic Colors</option>
+        <option value="split-complementary">Split Complementary Colors</option>
+        <option value="tetradic">Tetradic Colors</option>
+      </select>
+    </div>
+  
+    <div class="palette-Display" id="palette"></div>
+
+    <!-- Generate Another Palette Button -->
+    <button
+      class="generate-another-btn"
+      id="generateAnotherBtn"
+      onclick="generateAnotherPalette()"
+    >
+      Generate Another Palette
+    </button>
+
+    <script>
+      // CSV Links
+      const honoluluLink =
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWX5o2UVgrCmKUlQO8mZOvlvpeI5qIRj8VoQzv-2qI_Nswun0qg6FRnJYxeEYk8QkIK7NXIGaxetkZ/pub?output=csv";
+     
+      // Current filter
+      let currentFilter = "random";
+
+      // Filter change
+      function handleFilterChange() {
+        currentFilter = document.getElementById("filterSelect").value;
+        generatePalette('honolulu');
+      }
+
+      // Convert hexcodes to HSV
+      function hexToHSV(hex) {
+        hex = hex.replace(/^#/, "");
+
+        const r = parseInt(hex.slice(0, 2), 16) / 255;
+        const g = parseInt(hex.slice(2, 4), 16) / 255;
+        const b = parseInt(hex.slice(4, 6), 16) / 255;
+
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const diff = max - min;
+
+        let h = 0;
+        let s = max === 0 ? 0 : diff / max;
+        let v = max;
+
+        if (diff !== 0) {
+          switch (max) {
+            case r:
+              h = 60 * (((g - b) / diff) % 6);
+              break;
+            case g:
+              h = 60 * ((b - r) / diff + 2);
+              break;
+            case b:
+              h = 60 * ((r - g) / diff + 4);
+              break;
+          }
+        }
+
+        h = h < 0 ? h + 360 : h;
+
+        return {
+          h: h,
+          s: s * 100,
+          v: v * 100,
+        };
+      }
+
+      // Process CSV Links
+      async function fetchColorData(csvLink) {
+        const response = await fetch(csvLink);
+        const csvText = await response.text();
+
+        const rows = csvText.split("\n").slice(1);
+        return rows
+          .filter((row) => row.trim() !== "")
+          .map((row) => {
+            const [name, secondName, hexCode] = row.split(",");
+            return {
+              name: name.trim(),
+              secondName: secondName.trim(),
+              hex: `#${hexCode.trim()}`,
+            };
+          });
+      }
+
+      // Color data for each Marker Line
+      let honoluluColors = [];
+     
+      // Fetch data for Marker Lines
+      async function loadColorData() {
+        honoluluColors = await fetchColorData(honoluluLink);
+        // Automatically generate palette once colors are loaded
+        generatePalette('honolulu');
+      }
+
+      // Calculate brightness of a color (for text color)
+      function calculateBrightness(hex) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        return brightness;
+      }
+
+      // Track last selected button - no longer needed but kept for compatibility
+      let lastSelectedButton = null;
+
+      // Generate a palette based on the selected Marker Line
+      function generatePalette(MarkerLine) {
+        // No button highlighting needed now
+        
+        let selectedMarkerLineColors = [];
+
+        // Only use Honolulu colors regardless of the MarkerLine parameter
+        selectedMarkerLineColors = honoluluColors;
+
+        // Apply Filter
+        if (currentFilter === "similar") {
+          const randomHue = Math.random() * 360;
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return (
+              Math.abs(hsv.h - randomHue) <= 10 ||
+              Math.abs(hsv.h - randomHue + 360) <= 10
+            );
+          });
+        } else if (currentFilter === "pastel") {
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return hsv.s <= 30 && hsv.v >= 80;
+          });
+        } else if (currentFilter === "vivid") {
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return hsv.s >= 50 && hsv.v >= 50;
+          });
+        } else if (currentFilter === "moody") {
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return hsv.v <= 60;
+          });
+        } else if (currentFilter === "neutrals") {
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return (
+              hsv.s <= 7 ||
+              (((hsv.h >= 30 && hsv.h <= 50) ||
+                (hsv.h >= 50 && hsv.h <= 50) ||
+                (hsv.h >= 15 && hsv.h < 30)) &&
+                hsv.s >= 0 &&
+                hsv.s <= 100 &&
+                hsv.v >= 0 &&
+                hsv.v <= 85)
+            );
+          });
+        } else if (currentFilter === "warm") {
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return (
+              ((hsv.h >= 0 && hsv.h <= 50) || 
+                (hsv.h >= 340 && hsv.h <= 360)) &&
+              hsv.s >= 20 
+            );
+          });
+        } else if (currentFilter === "cool") {
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return (
+              (hsv.h >= 160 && hsv.h <= 280) && 
+              hsv.s >= 15 
+            );
+          });
+        } else if (currentFilter === "complementary") {
+          const randomHue = Math.random() * 360;
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return (
+              Math.abs(hsv.h - ((randomHue + 180) % 360)) <= 10 ||
+              Math.abs(hsv.h - ((randomHue + 180 + 360) % 360)) <= 10
+            );
+          });
+        } else if (currentFilter === "analogous") {
+          const randomHue = Math.random() * 360;
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return (
+              Math.abs(hsv.h - randomHue) <= 30 ||
+              Math.abs(hsv.h - randomHue + 360) <= 30
+            );
+          });
+        } else if (currentFilter === "triadic") {
+          const randomHue = Math.random() * 360;
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return (
+              Math.abs(hsv.h - randomHue) <= 10 ||
+              Math.abs(hsv.h - ((randomHue + 120) % 360)) <= 10 ||
+              Math.abs(hsv.h - ((randomHue + 240) % 360)) <= 10
+            );
+          });
+        } else if (currentFilter === "tetradic") {
+          const randomHue = Math.random() * 360;
+          selectedMarkerLineColors = selectedMarkerLineColors.filter((color) => {
+            const hsv = hexToHSV(color.hex);
+            return (
+              Math.abs(hsv.h - randomHue) <= 10 ||
+              Math.abs(hsv.h - ((randomHue + 90) % 360)) <= 10 ||
+              Math.abs(hsv.h - ((randomHue + 180) % 360)) <= 10 ||
+              Math.abs(hsv.h - ((randomHue + 270) % 360)) <= 10
+            );
+          });
+        }
+             
+        let numColors = 10;
+
+        // Check if there are enough colors [Kaala bug fix!!]
+        if (selectedMarkerLineColors.length < numColors) {
+          console.warn(
+            `Not enough colors to generate a full palette (${numColors} colors requested). Using available ${selectedMarkerLineColors.length} colors instead.`
+          );
+          // Use available colors as the palette size
+          numColors = selectedMarkerLineColors.length;
+        }
+
+        const randomColors = [];
+        const usedColors = new Set();
+
+        while (
+          randomColors.length < numColors &&
+          selectedMarkerLineColors.length > 0
+        ) {
+          const randomIndex = Math.floor(
+            Math.random() * selectedMarkerLineColors.length
+          );
+          const randomColor = selectedMarkerLineColors[randomIndex];
+          if (!usedColors.has(randomColor.hex)) {
+            randomColors.push(randomColor);
+            usedColors.add(randomColor.hex);
+          }
+        }
+
+        // Display the palette colors
+        const paletteDisplay = document.getElementById("palette");
+        paletteDisplay.innerHTML = "";
+        randomColors.forEach((color) => {
+          const brightness = calculateBrightness(color.hex);
+          const textColor = brightness > 128 ? "#000" : "#fff";
+          const colorBlock = document.createElement("div");
+          colorBlock.className = "color-block";
+          colorBlock.style.backgroundColor = color.hex;
+          colorBlock.style.color = textColor;
+          colorBlock.innerHTML = `<div>${color.name}<br>${color.secondName}<br>${color.hex}</div>`;
+          paletteDisplay.appendChild(colorBlock);
+        });
+      }
+
+      // Generate another palette, directly call with 'honolulu'
+      function generateAnotherPalette() {
+        generatePalette('honolulu');
+      }
+
+      // Load data when the page loads
+      loadColorData();
+    </script>
+    <p>Thank you to MysticSparklesWing for creating this! I edited this from her codes on <a href="https://github.com/MysticSparkleWings/OhuhuPaletteGenerator">Github.io</a>
+    <p>This only includes the 216 Ohuhu Honolulu Marker Set colors. I have no affiliations with Ohuhu.</p>
+  </body>
+</html>
